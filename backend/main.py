@@ -1,11 +1,14 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from supabase import create_client, Client
-from ai_agent import analyze_journal_entry
-import logging
 import os
+from supabase import create_client, Client
 from dotenv import load_dotenv
+import openai
+from db.models import journal_entry, journal_analysis
+from ai_agent import analyze_journal_entry
+from pydantic import BaseModel
+from uuid import UUID
+import logging
 
 # Configure logging
 logging.basicConfig(
@@ -13,22 +16,25 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
-# Load environment variables
 load_dotenv()
 
-# Initialize Supabase client
-supabase: Client = create_client(
-    os.getenv("SUPABASE_URL"),
-    os.getenv("SUPABASE_KEY")
-)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+openai.api_key = OPENAI_API_KEY
 
-# Initialize FastAPI app
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 app = FastAPI()
 
-# Configure CORS
+
+origins = [
+    "http://localhost:3000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,59 +43,50 @@ app.add_middleware(
 class JournalEntryRequest(BaseModel):
     content: str
 
-MOCK_USER_ID = "d2aa1300-0d4d-4588-a0f9-5c37c9e9f89e"
-
 @app.post("/analyze-entry")
 async def analyze_entry(entry: JournalEntryRequest):
     try:
         analysis = analyze_journal_entry(entry.content)
-        return {"status": "success", "analysis": analysis}
+        return {
+            "status": "success",
+            "analysis": analysis
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+MOCK_USER_ID = "d2aa1300-0d4d-4588-a0f9-5c37c9e9f89e"
+
 @app.post("/journal-entry")
 async def create_journal_entry(entry: JournalEntryRequest):
-    # Validate input
-    if not entry.content.strip():
-        raise HTTPException(status_code=400, detail="Journal entry content cannot be empty")
-
     try:
-        # Save journal entry
+        # Validate input
+        if not entry.content.strip():
+            raise HTTPException(status_code=400, detail="Journal entry content cannot be empty")
+
+        # Save journal entry to Supabase
         entry_data = {
             "user_id": MOCK_USER_ID,
             "entry": entry.content,
-            "created_at": "now()"
+            "created_at": "now()"  # Add created_at timestamp
         }
-        entry_result = supabase.table("journal_entries").insert(entry_data).execute()
+        
+        try:
+            entry_result = supabase.table("journal_entries").insert(entry_data).execute()
+        except Exception as db_error:
+            logging.error(f"Database error saving journal entry: {str(db_error)}")
+            raise HTTPException(status_code=500, detail="Failed to save journal entry to database")
         
         if not entry_result.data:
             raise HTTPException(status_code=500, detail="No data returned from database")
-        
+            
         entry_id = entry_result.data[0]["id"]
         
         # Get AI analysis
         try:
             analysis = analyze_journal_entry(entry.content)
-            
-            # Save analysis
-            analysis_data = {
-                "entry_id": entry_id,
-                "mood": analysis["mood"],
-                "summary": analysis["summary"],
-                "created_at": "now()"
-            }
-            analysis_result = supabase.table("journal_analyses").insert(analysis_data).execute()
-            
-            return {
-                "status": "success",
-                "data": {
-                    "entry": entry_result.data[0],
-                    "analysis": analysis_result.data[0]
-                }
-            }
-            
-        except Exception as analysis_error:
-            logging.error(f"Analysis error: {str(analysis_error)}")
+        except Exception as ai_error:
+            logging.error(f"AI analysis error: {str(ai_error)}")
+            # Save the entry even if analysis fails
             return {
                 "status": "partial_success",
                 "data": {
@@ -97,10 +94,44 @@ async def create_journal_entry(entry: JournalEntryRequest):
                     "error": "Analysis failed but entry was saved"
                 }
             }
-            
+        
+        # Save analysis to Supabase
+        analysis_data = {
+            "entry_id": entry_id,
+            "mood": analysis["mood"],
+            "summary": analysis["summary"],
+            "created_at": "now()"
+        }
+        
+        try:
+            analysis_result = supabase.table("journal_analyses").insert(analysis_data).execute()
+        except Exception as analysis_db_error:
+            logging.error(f"Database error saving analysis: {str(analysis_db_error)}")
+            return {
+                "status": "partial_success",
+                "data": {
+                    "entry": entry_result.data[0],
+                    "analysis": analysis,
+                    "error": "Analysis generated but failed to save to database"
+                }
+            }
+        
+        return {
+            "status": "success",
+            "data": {
+                "entry": entry_result.data[0],
+                "analysis": analysis_result.data[0]
+            }
+        }
+        
+    except HTTPException as http_error:
+        raise http_error
     except Exception as e:
-        logging.error(f"Database error: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to process journal entry")
+        logging.error(f"Unexpected error in create_journal_entry: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"An unexpected error occurred: {str(e)}"
+        )
 
 @app.get("/")
 def read_root():
