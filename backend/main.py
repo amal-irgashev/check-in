@@ -27,9 +27,9 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = FastAPI()
 
-
 origins = [
     "http://localhost:3000",
+    "http://localhost:8501",
 ]
 
 app.add_middleware(
@@ -59,47 +59,30 @@ MOCK_USER_ID = "d2aa1300-0d4d-4588-a0f9-5c37c9e9f89e"
 @app.post("/journal-entry")
 async def create_journal_entry(entry: JournalEntryRequest):
     try:
-        # Validate input
-        if not entry.content.strip():
-            raise HTTPException(status_code=400, detail="Journal entry content cannot be empty")
-
-        # Save journal entry to Supabase
+        # Save entry to Supabase
         entry_data = {
+            "entry": entry.content,  # Changed from 'content' to 'entry'
             "user_id": MOCK_USER_ID,
-            "entry": entry.content,
-            "created_at": "now()"  # Add created_at timestamp
+            "created_at": "now()"
         }
         
-        try:
-            entry_result = supabase.table("journal_entries").insert(entry_data).execute()
-        except Exception as db_error:
-            logging.error(f"Database error saving journal entry: {str(db_error)}")
-            raise HTTPException(status_code=500, detail="Failed to save journal entry to database")
+        entry_result = supabase.table("journal_entries").insert(entry_data).execute()
         
         if not entry_result.data:
-            raise HTTPException(status_code=500, detail="No data returned from database")
+            raise HTTPException(status_code=500, detail="Failed to save journal entry")
             
-        entry_id = entry_result.data[0]["id"]
+        entry_id = entry_result.data[0]['id']
         
         # Get AI analysis
-        try:
-            analysis = analyze_journal_entry(entry.content)
-        except Exception as ai_error:
-            logging.error(f"AI analysis error: {str(ai_error)}")
-            # Save the entry even if analysis fails
-            return {
-                "status": "partial_success",
-                "data": {
-                    "entry": entry_result.data[0],
-                    "error": "Analysis failed but entry was saved"
-                }
-            }
+        analysis = analyze_journal_entry(entry.content)
         
         # Save analysis to Supabase
         analysis_data = {
             "entry_id": entry_id,
             "mood": analysis["mood"],
             "summary": analysis["summary"],
+            "categories": analysis["categories"],
+            "key_insights": analysis["key_insights"],
             "created_at": "now()"
         }
         
@@ -120,7 +103,7 @@ async def create_journal_entry(entry: JournalEntryRequest):
             "status": "success",
             "data": {
                 "entry": entry_result.data[0],
-                "analysis": analysis_result.data[0]
+                "analysis": analysis
             }
         }
         
@@ -132,6 +115,16 @@ async def create_journal_entry(entry: JournalEntryRequest):
             status_code=500, 
             detail=f"An unexpected error occurred: {str(e)}"
         )
+
+@app.get("/entries")
+async def get_entries():
+    try:
+        entries = supabase.table("journal_entries")\
+            .select("*, journal_analyses(*)").execute()
+        return entries.data
+    except Exception as e:
+        logging.error(f"Failed to fetch entries: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch entries")
 
 @app.get("/")
 def read_root():

@@ -1,7 +1,13 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from typing import List, Optional
 from datetime import datetime
 from uuid import UUID
+
+class User(BaseModel):
+    id: UUID
+    email: EmailStr
+    email_verified: bool
+    created_at: datetime
 
 class journal_entry(BaseModel):
     id: UUID
