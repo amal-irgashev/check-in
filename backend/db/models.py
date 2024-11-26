@@ -20,4 +20,6 @@ class journal_analysis(BaseModel):
     entry_id: UUID
     mood: str
     summary: str
+    caregories: str
+    key_insights: str
     created_at: datetime
