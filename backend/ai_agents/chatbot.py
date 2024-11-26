@@ -9,6 +9,7 @@ from fastapi import HTTPException
 import logging
 from db.models import journal_entry, journal_analysis
 from supabase import create_client, Client
+from db.supabase_client import get_client
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -27,6 +28,9 @@ def analyze_journal_patterns(user_id: str, query: str = None) -> Dict:
         Dict containing the analysis response
     """
     try:
+        # Get authenticated client
+        supabase = get_client()
+        
         # Fetch entries from Supabase
         entries_result = supabase.table("journal_entries")\
             .select("*, journal_analyses(*)")\
@@ -35,7 +39,7 @@ def analyze_journal_patterns(user_id: str, query: str = None) -> Dict:
             .execute()
             
         if not entries_result.data:
-            return {"response": "I don't see any journal entries yet. Would you like to share what's on your mind? I'm here to listen and help you reflect on your thoughts."}
+            return {"response": "I don't see any journal entries yet. Would you like to share what's on your mind?"}
             
         # Format entries for context
         entries_context = []
