@@ -1,5 +1,5 @@
 import streamlit as st
-from backend.db.supabase_client import get_client
+from supabase import create_client, Client 
 import os
 from dotenv import load_dotenv
 import logging
@@ -8,7 +8,7 @@ import logging
 load_dotenv()
 
 # Initialize Supabase client
-supabase = get_client(
+supabase = create_client(
     os.getenv("SUPABASE_URL"),
     os.getenv("SUPABASE_KEY")
 )
