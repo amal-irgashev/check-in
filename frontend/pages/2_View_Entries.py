@@ -22,17 +22,22 @@ search_term = st.text_input("Search entries", placeholder="Enter keywords...")
 # Add loading state
 with st.spinner("Loading entries..."):
     try:
-        # Construct query parameters
-        params = {}
+        # Construct query string
+        query_params = []
         if search_term:
-            params['search'] = search_term
+            query_params.append(f"search={search_term}")
         if start_date:
-            params['start_date'] = start_date.isoformat()
+            query_params.append(f"start_date={start_date.isoformat()}")
         if end_date:
-            params['end_date'] = end_date.isoformat()
+            query_params.append(f"end_date={end_date.isoformat()}")
             
-        # Fetch entries from API using authenticated request with query parameters
-        response = make_authenticated_request("GET", "entries", params=params)
+        # Build endpoint with query string
+        endpoint = "entries"
+        if query_params:
+            endpoint += "?" + "&".join(query_params)
+            
+        # Fetch entries from API
+        response = make_authenticated_request("GET", endpoint)
         entries = response
 
         def delete_entry(entry_id: str):
@@ -65,7 +70,7 @@ with st.spinner("Loading entries..."):
                         col1, col2 = st.columns([0.8, 0.2])
                         with col2:
                             # Make delete button more visible with custom styling
-                            if st.button("🗑️ Delete Entry", key=delete_key, help="Delete this entry", type="secondary", use_container_width=True):
+                            if st.button("Delete", key=delete_key, help="Delete this entry", type="secondary", use_container_width=True):
                                 st.session_state[confirm_key] = True
                         
                         # Show confirmation dialog if needed
@@ -89,10 +94,10 @@ with st.spinner("Loading entries..."):
                         if entry.get('journal_analyses') and len(entry['journal_analyses']) > 0:
                             analysis = entry['journal_analyses'][0]
                             st.markdown("---")
-                            st.write("**Mood:**", analysis.get('mood', 'N/A'))
-                            st.write("**Summary:**", analysis.get('summary', 'N/A'))
+                            st.markdown(":orange[**Mood:**] " + analysis.get('mood', 'N/A'))
+                            st.markdown(":orange[**Summary:**] " + analysis.get('summary', 'N/A'))
                             if analysis.get('key_insights'):
-                                st.write("**Key Insights:**", analysis['key_insights'])
+                                st.markdown(":orange[**Key Insights:**] " + analysis['key_insights'])
                 except Exception as e:
                     st.error(f"Error formatting entry: {str(e)}")
         else:

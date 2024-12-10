@@ -82,20 +82,32 @@ with st.sidebar:
                                 st.rerun()
                 
                 with col3:
-                    # Delete button
+                    # Delete button with confirmation dialog
+                    if "delete_confirmation" not in st.session_state:
+                        st.session_state.delete_confirmation = {}
+                    
                     if st.button("🗑️", key=f"delete_{window['id']}", help="Delete chat"):
-                        if st.button(
-                            "Confirm delete?", 
-                            key=f"confirm_delete_{window['id']}"
-                        ):
-                            response = make_authenticated_request(
-                                "DELETE",
-                                f"chat/window/{window['id']}"
-                            )
-                            if response:
-                                if st.session_state.current_window_id == window["id"]:
-                                    st.session_state.current_window_id = None
-                                    st.session_state.messages = []
+                        st.session_state.delete_confirmation[window['id']] = True
+                        st.rerun()
+                    
+                    if st.session_state.delete_confirmation.get(window['id']):
+                        st.write("Are you sure?")
+                        col3a, col3b = st.columns(2)
+                        with col3a:
+                            if st.button("Yes", key=f"confirm_delete_{window['id']}"):
+                                response = make_authenticated_request(
+                                    "DELETE",
+                                    f"chat/window/{window['id']}"
+                                )
+                                if response:
+                                    if st.session_state.current_window_id == window['id']:
+                                        st.session_state.current_window_id = None
+                                        st.session_state.messages = []
+                                    st.session_state.delete_confirmation.pop(window['id'])
+                                    st.rerun()
+                        with col3b:
+                            if st.button("No", key=f"cancel_delete_{window['id']}"):
+                                st.session_state.delete_confirmation.pop(window['id'])
                                 st.rerun()
     except Exception as e:
         st.error(f"Failed to load chat windows: {str(e)}")

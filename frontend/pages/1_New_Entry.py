@@ -35,10 +35,19 @@ with st.form("journal_entry_form"):
                 if "data" in response and "analysis" in response["data"]:
                     analysis = response["data"]["analysis"]
                     with st.expander("View AI Analysis"):
-                        st.write("**Mood:**", analysis.get("mood", "N/A"))
-                        st.write("**Summary:**", analysis.get("summary", "N/A"))
-                        st.write("**Categories:**", analysis.get("categories", "N/A"))
-                        st.write("**Key Insights:**", analysis.get("key_insights", "N/A"))
+                        st.markdown(":orange[**Mood:**] " + analysis.get("mood", "N/A"))
+                        st.markdown(":orange[**Summary:**] " + analysis.get("summary", "N/A"))
+                        
+                        # Display categories in a more readable format
+                        categories = analysis.get("categories", "N/A")
+                        if isinstance(categories, list):
+                            st.markdown(":orange[**Categories:**]")
+                            for category in categories:
+                                st.write(f"• {category}")
+                        else:
+                            st.markdown(":orange[**Categories:**] " + categories)
+                            
+                        st.markdown(":orange[**Key Insights:**] " + analysis.get("key_insights", "N/A"))
             else:
                 st.error("Failed to save entry")
         except Exception as e:

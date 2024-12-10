@@ -39,6 +39,7 @@ class JournalEntryRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
+    window_id: str
 
 # Helper function for common auth setup
 async def setup_auth_session(request: Request):
