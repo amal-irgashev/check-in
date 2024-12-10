@@ -52,3 +52,6 @@ htmlcov/
 .pytest_cache/
 .tox/
 
+# Streamlit secrets
+frontend/.streamlit/secrets.toml
+

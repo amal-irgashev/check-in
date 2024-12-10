@@ -1,0 +1,16 @@
+[browser]
+serverAddress = "0.0.0.0"
+gatherUsageStats = false
+
+[theme]
+primaryColor = "#FF4B4B"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F0F2F6"
+textColor = "#262730"
+
+[server]
+enableCORS = true
+enableXsrfProtection = true
+
+[logger]
+level = "info" 
