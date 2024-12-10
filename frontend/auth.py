@@ -3,6 +3,8 @@ from supabase import create_client, Client
 import os
 from dotenv import load_dotenv
 import logging
+import datetime
+from supabase.client import AuthApiError, AuthInvalidCredentialsError
 
 # Load environment variables
 load_dotenv()
@@ -81,31 +83,48 @@ def sign_in(email: str, password: str) -> tuple[bool, str]:
 
 def sign_up(email: str, password: str) -> tuple[bool, str]:
     try:
+        # Use the Supabase auth.sign_up method with proper options
         response = supabase.auth.sign_up({
             "email": email,
-            "password": password
+            "password": password,
+            "options": {
+                "data": {
+                    "email": email,
+                    "created_at": datetime.datetime.utcnow().isoformat()
+                }
+            }
         })
         
         if response.user:
-            if response.user.confirmed_at:
-                # User is automatically confirmed
+            user_id = response.user.id
+            
+            if response.session:  # Auto-confirm is enabled
+                st.session_state.authenticated = True
+                st.session_state.user = response.user
+                st.session_state.access_token = response.session.access_token
+                st.session_state.refresh_token = response.session.refresh_token
                 return True, "Account created successfully!"
-            else:
-                # Email confirmation required
+            else:  # Email confirmation required
                 return True, "Please check your email to confirm your account."
-        return False, "Failed to create account."
+                
+        logging.error(f"Sign up failed with response: {response}")
+        return False, "Failed to create account. Please try again."
         
-    except Exception as e:
+    except AuthApiError as e:
         error_msg = str(e)
+        logging.error(f"Auth API error during sign up: {error_msg}")
+        
         if "User already registered" in error_msg:
             return False, "This email is already registered."
         elif "Password should be at least" in error_msg:
-            return False, "Password is too weak. Please use a stronger password."
-        elif "Invalid email" in error_msg:
+            return False, "Password must be at least 6 characters long."
+        elif "valid email" in error_msg.lower():
             return False, "Please enter a valid email address."
-        else:
-            logging.error(f"Sign up error: {error_msg}")
-            return False, "An error occurred during sign up. Please try again."
+        return False, "Sign up failed. Please check your credentials."
+        
+    except Exception as e:
+        logging.error(f"Sign up error: {str(e)}")
+        return False, f"An unexpected error occurred: {str(e)}"
 
 def logout_user():
     _clear_session()
