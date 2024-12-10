@@ -7,6 +7,7 @@ from services.database_service import DatabaseService
 from db.supabase_client import get_client
 import openai
 from typing import Generator
+from services.chat_service import ChatService
 
 
 # client + logging
@@ -14,12 +15,23 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-async def get_chat_response(user_id: str, message: str, conversation_history: List[Dict] = None) -> Generator:
+async def get_chat_response(user_id: str, message: str, window_id: str, conversation_history: List[Dict] = None) -> Generator:
     """
     Generates a streaming response from Levi, a friendly AI chatbot that provides personalized insights
     based on the user's journal entries, profile data, and conversation history.
     """
     try:
+        # Get chat history if not provided
+        if conversation_history is None:
+            conversation_history = await ChatService.get_chat_history(user_id, window_id)
+        
+        # Save user message
+        await ChatService.save_message(user_id, window_id, "user", message)
+        
+        # Generate title if this is the first message
+        if not conversation_history:
+            await ChatService.generate_and_update_title(user_id, window_id, message)
+        
         # Get user's recent journal entries and analyses
         entries_result = DatabaseService.get_recent_entries(user_id, limit=5)
         
@@ -73,8 +85,8 @@ async def get_chat_response(user_id: str, message: str, conversation_history: Li
         system_prompt = f"""You are Levi, a friendly and empathetic AI companion. Your current conversation is with {user_name} (this is their actual name - always use it). 
         Maintain a warm, conversational tone while being professional. Your responses should be concise but meaningful. 
         Help {user_name} process their thoughts and feelings by referencing their journal entries, profile data, 
-        and previous analyses. Keep responses under 150 words and focus on being supportive and actionable. 
-        When discussing patterns or progress, reference both journal entries and user statistics.""".strip()
+        and previous analyses. Keep responses concise and focus on being supportive and action driven. 
+        When discussing patterns or progress, reference both journal entries and user statistics. Ask questions to help them reflect on their thoughts and feelings.""".strip()
 
         context_prompt = f"""User's Profile and Journal Context:
 
@@ -107,20 +119,26 @@ async def get_chat_response(user_id: str, message: str, conversation_history: Li
         })
 
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o",
             temperature=0.2,
             messages=messages,
-            max_tokens=300,
+            max_tokens=3000,
             stream=True  
         )
 
+        # Collect the full response
+        full_response = ""
         for chunk in response:
             if chunk.choices[0].delta.content is not None:
-                yield chunk.choices[0].delta.content
+                content = chunk.choices[0].delta.content
+                full_response += content
+                yield content
+        
+        # Save assistant's response
+        await ChatService.save_message(user_id, window_id, "assistant", full_response)
                 
     except Exception as e:
         logging.error(f"Error generating chat response: {str(e)}")
-        if "model not found" in str(e).lower():
-            yield "I apologize, but there seems to be an issue with the AI model configuration. Please contact support."
-        else:
-            yield f"I apologize, but I encountered an error: {str(e)}"
+        error_message = "I apologize, but I encountered an error. Please try again."
+        await ChatService.save_message(user_id, window_id, "assistant", error_message)
+        yield error_message

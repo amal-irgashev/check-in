@@ -40,26 +40,25 @@ def handle_request_error(error: requests.exceptions.RequestException):
             
     raise Exception(f"Request failed: {str(error)}")
 
-def make_authenticated_request(method: str, endpoint: str, data: dict = None, params: dict = None, stream: bool = False):
-    """
-    Make an authenticated request to the backend API
-    """
-    api_url = f"{API_BASE_URL}/{endpoint.lstrip('/')}"
-    headers = get_auth_headers()
-    
+def make_authenticated_request(method: str, endpoint: str, data: dict = None, stream: bool = False):
+    """Make an authenticated request to the backend API"""
     try:
-        if method == "GET":
-            response = requests.get(api_url, headers=headers, params=params)
-        elif method == "POST":
-            response = requests.post(api_url, headers=headers, json=data, stream=stream)
-        elif method == "DELETE":
-            response = requests.delete(api_url, headers=headers)
+        url = f"{API_BASE_URL}/{endpoint}"
+        headers = get_auth_headers()
+        
+        if method.upper() == "GET":
+            response = requests.get(url, headers=headers, stream=stream)
+        elif method.upper() == "POST":
+            response = requests.post(url, json=data, headers=headers, stream=stream)
+        else:
+            raise ValueError(f"Unsupported HTTP method: {method}")
             
         if stream:
             return response
             
         response.raise_for_status()
         return response.json()
+        
     except requests.exceptions.RequestException as e:
         handle_request_error(e)
 
