@@ -29,7 +29,8 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:8501",
         "https://digital-journal.streamlit.app",
-        "https://*.railway.app"  # Allow Railway domains
+        "https://*.streamlit.app",
+        "https://check-in-production-eebb.up.railway.app"
     ],
     allow_credentials=True,
     allow_methods=["*"],
