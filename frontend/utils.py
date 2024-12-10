@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any
 load_dotenv()
 
 # URL for backend API
-API_BASE_URL = os.getenv("BACKEND_URL", "https://check-in.railway.internal")
+API_BASE_URL = os.getenv("BACKEND_URL", "https://check-in-production-eebb.up.railway.app")
 
 
 # MAKE AUTHENTICATED REQUEST

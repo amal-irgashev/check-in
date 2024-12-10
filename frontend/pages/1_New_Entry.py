@@ -9,7 +9,6 @@ from datetime import datetime
 from auth import init_auth
 from utils import make_authenticated_request
 
-API_URL = "http://localhost:8000"
 
 init_auth()
 
