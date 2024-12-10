@@ -39,7 +39,7 @@ if not st.session_state.get('authenticated', False):
 
 # Show authentication page if not authenticated
 if not st.session_state.authenticated:
-    st.title("Welcome to Smart Journal")
+    st.title("Welcome to Check-in - a Smart Journalling App")
     
     tab1, tab2 = st.tabs(["Login", "Sign Up"])
     

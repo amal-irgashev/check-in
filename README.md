@@ -489,3 +489,16 @@ You know what's funny? When we first talked about this project, I thought "cool,
 The auth stuff nearly broke me though - every time I thought I fixed something, three new issues popped up. Seriously, I must have rewritten the token refresh logic like five times. And don't even get me started on that database error during signup that's still there (sorry about that). 
 
 Working with openai was probably the most interesting part. Took me forever to get the prompts right - turns out you really need to be specific with AI. At first, Levi was giving these vague, fortune-cookie responses, but after tweaking the prompts and adding all that context about past entries and moods, it started feeling more like chatting with someone who actually knows you. And even though there are still some bugs (okay, quite a few bugs), I'm actually using this app myself now. There's something satisfying about building something that actually solves a problem you have.
+
+
+---
+
+# UPDATE ON THE CLASS DEMO!
+
+the ai functionlaity did not work since my API key was exposed. All fixed now!
+
+<img src="./readme/analysis_proof.png" alt="Analysis Proof" />
+<img src="./readme/chat_proof.png" alt="Chat Proof" />
+
+
+
