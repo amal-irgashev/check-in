@@ -1,6 +1,7 @@
 import streamlit as st
 from auth import init_auth
 from utils import make_authenticated_request
+from auth import sign_up, sign_in
 
 # Page settings - must be first Streamlit command
 st.set_page_config(
@@ -65,8 +66,7 @@ if not st.session_state.authenticated:
                 if signup_password != signup_password_confirm:
                     st.error("Passwords do not match!")
                 else:
-                    from auth import signup_user
-                    if signup_user(signup_email, signup_password):
+                    if sign_up(signup_email, signup_password):  # Changed from signup_user
                         st.info("Please go to the Login tab to sign in.")
 else:
     # Add logout button in top right
