@@ -3,8 +3,6 @@
 # - return analysis as json
 # - maybe add te ability to 
 
-
-
 from typing import Dict
 from openai import OpenAI
 import json
@@ -13,9 +11,11 @@ from dotenv import load_dotenv
 from fastapi import HTTPException
 import logging
 
+
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+# AI ANALYSIS
 def analyze_journal_entry(text: str) -> Dict:
     """
     Analyzes a journal entry using OpenAI's GPT model acting as an expert psychologist to extract 
@@ -62,18 +62,21 @@ Focus on providing clear, empathetic, and professionally-grounded psychological 
                 {"role": "user", "content": f"{prompt}\n\nJournal entry:\n{text}"}
             ]
         )
-        
+
         response_text = response.choices[0].message.content.strip()
         response_text = response_text.replace('```json', '').replace('```', '')
         
         analysis = json.loads(response_text)
         
+        # check all fields are present
         required_fields = ['mood', 'summary', 'categories', 'key_insights']
         if not all(field in analysis for field in required_fields):
             raise ValueError("Response missing required fields")
             
         return analysis
-        
+    
+    
+        # if not a JSON, raise an ERROR!
     except json.JSONDecodeError:
         logging.error(f"Invalid JSON response: {response_text}")
         raise HTTPException(status_code=500, detail="Failed to parse AI response")

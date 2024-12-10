@@ -1,3 +1,9 @@
+# NEW ENTRY PAGE
+# create a new journal entry
+# analyze the entry with AI
+# save the entry to the database
+
+
 import streamlit as st
 from datetime import datetime
 from auth import init_auth
@@ -20,7 +26,7 @@ with st.form("journal_entry_form"):
         height=300
     )
 
-    # Submit button
+    # SUBMIT button
     submit_button = st.form_submit_button("Save Entry")
 
     if submit_button:
@@ -37,28 +43,38 @@ with st.form("journal_entry_form"):
             )
             
             # Then create the journal entry
+            # Save the entry to the database
             response = make_authenticated_request(
                 "POST", 
                 "journal-entry",
                 {"content": entry_content}
             )
             
-            if response.get("status") == "success":
-                st.success("Entry saved successfully! 🎉")
+            # Check if save was successful
+            if response and response.get("status") == "success":
+                st.success("Your entry was saved! 🎉")
                 
-                if "data" in response and "analysis" in response["data"]:
-                    analysis = response["data"]["analysis"]
-                    
-                    with st.expander("View AI Analysis", expanded=True):
-                        st.markdown(":orange[**Mood:**] " + analysis.get("mood", "N/A"))
-                        st.markdown(":orange[**Summary:**] " + analysis.get("summary", "N/A"))
-                        st.markdown(":orange[**Key Insights:**] " + analysis.get("key_insights", "N/A"))
+                
+                
+                # Get the AI analysis if available
+                response_data = response.get("data", {})
+                analysis_data = response_data.get("analysis", {})
+                
+                
+                
+                # Show the analysis in an expandable section
+                with st.expander("View AI Analysis", expanded=True):
+                    st.markdown(":orange[**Mood:**] " + analysis_data.get("mood", "N/A")) 
+                    st.markdown(":orange[**Summary:**] " + analysis_data.get("summary", "N/A"))
+                    st.markdown(":orange[**Key Insights:**] " + analysis_data.get("key_insights", "N/A"))
             else:
-                st.error("Failed to save entry. Please try again.")
+                st.error("Something went wrong saving your entry. Try again?")
                 
         except Exception as e:
-            if "User not authenticated" in str(e):
-                st.error("Please log in to save entries.")
+            # Handle common errors
+            error_msg = str(e)
+            if "User not authenticated" in error_msg:
+                st.error("You need to log in first!")
             else:
-                st.error(f"An error occurred: {str(e)}")
-                st.exception(e)  # Show detailed error in development
+                st.error("Oops, something went wrong!")
+                print(f"Error details: {error_msg}")  # For debugging

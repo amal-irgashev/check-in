@@ -1,3 +1,9 @@
+# VIEW ENTRIES PAGE
+# view all journal entries
+# add date filters
+# add search box
+# add delete button
+
 import streamlit as st
 from datetime import datetime
 import logging
@@ -11,7 +17,7 @@ init_auth()
 st.title("📝 Journal Entries")
 
 
-# Let's add some date filters to narrow down entries
+# add some date filters to narrow down entries
 col1, col2 = st.columns(2)
 with col1:
     start_date = st.date_input("From")
@@ -35,6 +41,7 @@ with st.spinner("Loading entries..."):
             query_params.append(f"start_date={start_date.isoformat()}")
         if end_date:
             query_params.append(f"end_date={end_date.isoformat()}")
+            
             
         # Put together the API endpoint
         endpoint = "entries"
@@ -68,7 +75,8 @@ with st.spinner("Loading entries..."):
                 st.error(f"Error deleting entry: {str(e)}")
                 
                 
-
+                
+                
         # Show all our entries in a nice list
         if entries:
             for entry in entries:

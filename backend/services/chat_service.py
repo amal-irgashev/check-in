@@ -6,6 +6,7 @@ import os
 from openai import OpenAI
 from fastapi import HTTPException
 
+# chat services 
 class ChatService:
     @staticmethod
     async def create_chat_window(user_id: str, title: str = "New Chat") -> Dict:
@@ -19,6 +20,7 @@ class ChatService:
             logging.error(f"Error creating chat window: {str(e)}")
             return None
 
+    # get chat windows
     @staticmethod
     async def get_chat_windows(user_id: str) -> List[Dict]:
         try:
@@ -32,6 +34,7 @@ class ChatService:
             logging.error(f"Error getting chat windows: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e))
 
+    # get chat history
     @staticmethod
     async def get_chat_history(user_id: str, window_id: str) -> List[Dict]:
         try:
@@ -47,6 +50,8 @@ class ChatService:
             logging.error(f"Error getting chat history: {str(e)}")
             return []
 
+
+    # save message
     @staticmethod
     async def save_message(user_id: str, window_id: str, role: str, content: str) -> None:
         try:
@@ -65,6 +70,7 @@ class ChatService:
         except Exception as e:
             logging.error(f"Error saving chat message: {str(e)}")
 
+    # update chat window title
     @staticmethod
     async def update_window_title(window_id: str, title: str) -> None:
         try:
@@ -75,6 +81,8 @@ class ChatService:
         except Exception as e:
             logging.error(f"Error updating window title: {str(e)}")
 
+
+    # generate and update title with openai
     @staticmethod
     async def generate_and_update_title(user_id: str, window_id: str, message: str) -> None:
         try:
@@ -103,6 +111,7 @@ class ChatService:
         except Exception as e:
             logging.error(f"Error generating chat title: {str(e)}")
 
+    # delete chat window
     @staticmethod
     async def delete_window(user_id: str, window_id: str) -> bool:
         try:
@@ -123,6 +132,7 @@ class ChatService:
             logging.error(f"Error deleting chat window: {str(e)}")
             return False
 
+    # rename chat window
     @staticmethod
     async def rename_window(user_id: str, window_id: str, new_title: str) -> bool:
         try:

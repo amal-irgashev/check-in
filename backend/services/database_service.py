@@ -5,6 +5,7 @@ import logging
 from dataclasses import dataclass
 from typing import Dict
 
+# database service
 @dataclass
 class DatabaseResult:
     data: Optional[List[Dict]]
@@ -25,6 +26,8 @@ class DatabaseService:
                 detail="Failed to set authentication session"
             )
 
+
+    # create journal entry
     @staticmethod
     async def create_journal_entry(user_id: str, content: str):
         supabase = get_client()
@@ -35,6 +38,8 @@ class DatabaseService:
         }
         return supabase.table("journal_entries").insert(entry_data).execute()
         
+        
+    # save analysis
     @staticmethod
     async def save_analysis(entry_id: str, analysis: dict):
         supabase = get_client()
@@ -48,6 +53,8 @@ class DatabaseService:
         }
         return supabase.table("journal_analyses").insert(analysis_data).execute()
         
+        
+    # get user entries
     @staticmethod
     async def get_user_entries(user_id: str):
         supabase = get_client()
@@ -56,7 +63,10 @@ class DatabaseService:
             .eq('user_id', user_id)\
             .order('created_at', desc=True)\
             .execute()
-        
+            
+            
+    # get recent entries
+
     @staticmethod
     def get_recent_entries(user_id: str, limit: int = 3) -> DatabaseResult:
         """

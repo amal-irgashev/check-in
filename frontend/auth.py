@@ -1,3 +1,9 @@
+# AUTHENTICATION
+# login
+# sign up
+# logout
+# refresh session
+
 import streamlit as st
 from supabase import create_client
 import os
@@ -5,130 +11,161 @@ from dotenv import load_dotenv
 import logging
 from supabase.client import AuthApiError
 
-# Load environment variables and initialize client
+
+# Load environment variables
 load_dotenv()
 supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
 
+
+
 def init_auth():
-    # Initialize session state
-    for key in ['authenticated', 'user', 'access_token', 'refresh_token']:
-        if key not in st.session_state:
-            st.session_state[key] = None
-    st.session_state.authenticated = False
-    
+    # Set up session state variables
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False
+    if 'user' not in st.session_state:
+        st.session_state.user = None 
+    if 'access_token' not in st.session_state:
+        st.session_state.access_token = None
+    if 'refresh_token' not in st.session_state:
+        st.session_state.refresh_token = None
+        
     try:
+        # Get current session
         session = supabase.auth.get_session()
+        
+        # Return if no valid session
         if not session or not session.access_token:
             return
 
-        # Try refreshing token first
+        # Try to refresh the token
         try:
-            refresh_response = supabase.auth.refresh_session()
-            if refresh_response and refresh_response.session:
-                _update_session(refresh_response)
+            refresh = supabase.auth.refresh_session()
+            if refresh and refresh.session:
+                st.session_state.authenticated = True
+                st.session_state.user = refresh.user
+                st.session_state.access_token = refresh.session.access_token
+                st.session_state.refresh_token = refresh.session.refresh_token
                 return
         except:
             pass
 
-        # Verify current token as fallback
-        user_response = supabase.auth.get_user(session.access_token)
-        if user_response and user_response.user:
+
+
+        # Verify existing token
+        user = supabase.auth.get_user(session.access_token)
+        if user and user.user:
             st.session_state.authenticated = True
-            st.session_state.user = user_response.user
+            st.session_state.user = user.user
             st.session_state.access_token = session.access_token
             st.session_state.refresh_token = session.refresh_token
             
     except Exception as e:
-        logging.error(f"Auth initialization failed: {str(e)}")
-        _clear_session()
+        print(f"Auth error: {str(e)}")
+        clear_session()
 
-def _update_session(response):
-    st.session_state.authenticated = True
-    st.session_state.user = response.user
-    st.session_state.access_token = response.session.access_token
-    st.session_state.refresh_token = response.session.refresh_token
-
-def _clear_session():
+# CLEAR SESSION
+def clear_session():
     st.session_state.authenticated = False
     st.session_state.user = None
     st.session_state.access_token = None
     st.session_state.refresh_token = None
+    
     try:
         supabase.auth.sign_out()
     except Exception as e:
-        logging.error(f"Error during sign out: {str(e)}")
+        print(f"Sign out error: {str(e)}")
+        
     st.rerun()
 
+# REFRESH SESSION
 def refresh_session():
+    if not st.session_state.refresh_token:
+        return False
+        
     try:
-        if st.session_state.refresh_token:
-            response = supabase.auth.refresh_session(
-                refresh_token=st.session_state.refresh_token
-            )
-            if response and response.session:
-                _update_session(response)
-                return True
+        refresh = supabase.auth.refresh_session(
+            refresh_token=st.session_state.refresh_token
+        )
+        
+        if refresh and refresh.session:
+            st.session_state.authenticated = True
+            st.session_state.user = refresh.user
+            st.session_state.access_token = refresh.session.access_token
+            st.session_state.refresh_token = refresh.session.refresh_token
+            return True
+            
     except Exception as e:
-        logging.error(f"Session refresh failed: {str(e)}")
-        _clear_session()
+        print(f"Refresh error: {str(e)}")
+        clear_session()
+        
     return False
 
-def sign_in(email: str, password: str) -> tuple[bool, str]:
+# SIGN IN
+def sign_in(email, password):
     try:
-        response = supabase.auth.sign_in_with_password({
-            "email": email, 
+        auth = supabase.auth.sign_in_with_password({
+            "email": email,
             "password": password
         })
         
-        if response.user:
-            _update_session(response)
-            return True, "Successfully logged in!"
+        if auth.user:
+            st.session_state.authenticated = True
+            st.session_state.user = auth.user
+            st.session_state.access_token = auth.session.access_token
+            st.session_state.refresh_token = auth.session.refresh_token
+            return True, "Logged in!"
             
     except Exception as e:
-        error_msg = str(e)
-        if "Invalid login credentials" in error_msg:
-            return False, "Invalid email or password."
-        elif "Email not confirmed" in error_msg:
-            return False, "Please confirm your email address before logging in."
-        logging.error(f"Sign in error: {error_msg}")
-        return False, "An error occurred during sign in. Please try again."
+        error = str(e)
+        if "Invalid login" in error:
+            return False, "Wrong email/password"
+        if "Email not confirmed" in error:
+            return False, "Please confirm your email"
+        print(f"Login error: {error}")
+        return False, "Login failed"
     
-    return False, "Login failed. Please check your credentials."
+    return False, "Login failed"
 
-def sign_up(email: str, password: str) -> tuple[bool, str]:
+
+
+# SIGN UP
+def sign_up(email, password):
     if not os.getenv("SUPABASE_URL") or not os.getenv("SUPABASE_KEY"):
-        return False, "Service configuration error. Please contact support."
+        return False, "Missing config"
 
     try:
-        response = supabase.auth.sign_up({
+        auth = supabase.auth.sign_up({
             "email": email,
             "password": password,
             "options": {"data": {}}
         })
-        
-        if response.user:
-            if response.session:
-                _update_session(response)
-                return True, "Account created successfully!"
-            return True, "Please check your email to confirm your account."
+        # If user is created, set session state
+        if auth.user:
+            if auth.session:
+                st.session_state.authenticated = True
+                st.session_state.user = auth.user
+                st.session_state.access_token = auth.session.access_token
+                st.session_state.refresh_token = auth.session.refresh_token
+                return True, "Account created!"
+            return True, "Check email to confirm"
                 
-        return False, "Failed to create account. Please try again."
+        return False, "Sign up failed"
         
     except AuthApiError as e:
-        error_msg = str(e).lower()
-        if "already registered" in error_msg:
-            return False, "This email is already registered."
-        elif "password" in error_msg:
-            return False, "Password must be at least 6 characters long."
-        elif "valid email" in error_msg:
-            return False, "Please enter a valid email address."
+        error = str(e).lower()
+        if "already registered" in error:
+            return False, "Email already exists"
+        if "password" in error:
+            return False, "Password too short"
+        if "valid email" in error:
+            return False, "Invalid email"
         
-        logging.error(f"Auth API error: {str(e)}")
-        return False, "Sign up failed. Please try again later."
+        print(f"Sign up error: {str(e)}")
+        return False, "Sign up failed"
         
     except Exception as e:
-        logging.error(f"Unexpected error: {str(e)}")
-        return False, "An unexpected error occurred. Please try again later."
+        print(f"Error: {str(e)}")
+        return False, "Error occurred"
 
 def logout_user():
-    _clear_session()
+    clear_session()

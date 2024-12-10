@@ -20,6 +20,7 @@ class JournalService:
                 detail="Failed to analyze journal entry"
             )
 
+    # get journal entries!
     @staticmethod
     async def get_entries(
         user_id: str,
@@ -60,6 +61,9 @@ class JournalService:
                 status_code=500,
                 detail=f"Failed to retrieve journal entries: {str(e)}"
             )
+            
+
+# delete the entry
 
     @staticmethod
     async def delete_entry(user_id: str, entry_id: str) -> Dict[str, str]:

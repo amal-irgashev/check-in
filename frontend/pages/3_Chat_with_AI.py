@@ -1,3 +1,8 @@
+# CHAT WITH AI PAGE
+# chat with AI
+# save the chat to the database
+# display the chat in the sidebar
+
 import streamlit as st
 from auth import init_auth
 from utils import make_authenticated_request
@@ -40,6 +45,8 @@ with st.sidebar:
             st.session_state.current_window_id = response["id"]
             st.session_state.messages = []
             st.rerun()
+    
+    
     
     # List of existing chats
     try:

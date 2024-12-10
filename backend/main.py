@@ -39,6 +39,7 @@ class ChatRequest(BaseModel):
     message: str
     window_id: str
 
+
 # Helper function to handle auth stuff
 async def setup_auth_session(request: Request):
     user_id = await AuthService.validate_user(request)
@@ -63,6 +64,8 @@ async def analyze_entry(entry: JournalEntryRequest):
     return await JournalService.analyze_entry(entry.content)
 
 
+
+
 # Save and analyze a new journal entry
 @app.post("/journal-entry")
 async def create_journal_entry(entry: JournalEntryRequest, request: Request):
@@ -77,7 +80,6 @@ async def create_journal_entry(entry: JournalEntryRequest, request: Request):
     await DatabaseService.save_analysis(entry_id, analysis["analysis"])
     
     return {"status": "success", "data": {"entry": entry_result.data[0], "analysis": analysis["analysis"]}}
-
 
 
 # Get journal entries with optional filters
@@ -116,8 +118,6 @@ async def get_entries(request: Request, search: str = None, start_date: str = No
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
-
 # Chat endpoint that streams responses 
 @app.post("/chat")
 async def chat(request: Request, chat_request: ChatRequest):
@@ -132,7 +132,6 @@ async def chat(request: Request, chat_request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
     
     
-
 # Get user profile stats
 @app.get("/api/profile/stats")
 async def get_profile_stats(request: Request):
@@ -144,7 +143,6 @@ async def get_profile_stats(request: Request):
     except Exception as e:
         logging.error(f"Error in get_profile_stats: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to retrieve profile stats")
-    
     
 
 # Update user profile
@@ -199,7 +197,7 @@ async def get_window_history(window_id: str, request: Request):
 
 
 
-# Delete a chat window
+# Delete a chat window ( i dont think this works lol)
 @app.delete("/chat/window/{window_id}")
 async def delete_chat_window(window_id: str, request: Request):
     try:
@@ -212,7 +210,7 @@ async def delete_chat_window(window_id: str, request: Request):
 
 
 
-# Rename a chat window
+# Rename a chat window (i dont think this works lol)
 @app.put("/chat/window/{window_id}/rename")
 async def rename_chat_window(window_id: str, request: Request, data: dict):
     try:

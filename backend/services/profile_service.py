@@ -46,7 +46,7 @@ class ProfileService:
                 status_code=500,
                 detail="Failed to retrieve profile statistics"
             )
-
+# update that profile
     @staticmethod
     async def update_profile(supabase_client, data: dict):
         try:

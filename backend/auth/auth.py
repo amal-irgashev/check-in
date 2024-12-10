@@ -10,6 +10,7 @@ supabase = create_client(
     os.getenv("SUPABASE_KEY")
 )
 
+# auth 
 class AuthService:
     @staticmethod
     async def sign_up(email: str, password: str):
@@ -21,6 +22,7 @@ class AuthService:
         except Exception as e:
             raise Exception(f"Error during sign up: {str(e)}")
 
+    # Sign in
     @staticmethod
     async def sign_in(email: str, password: str):
         try:
@@ -31,6 +33,7 @@ class AuthService:
         except Exception as e:
             raise Exception(f"Error during sign in: {str(e)}")
 
+    # Sign out
     @staticmethod
     async def sign_out():
         try:
@@ -38,6 +41,8 @@ class AuthService:
         except Exception as e:
             raise Exception(f"Error during sign out: {str(e)}")
 
+    
+    # Get user
     @staticmethod
     async def get_user(access_token: str):
         try:
@@ -49,6 +54,7 @@ class AuthService:
             logging.error(f"Error in get_user: {str(e)}")
             raise Exception(f"Error getting user: {str(e)}")
 
+# fast api middleware
 async def auth_middleware(request: Request, call_next):
     auth_header = request.headers.get('Authorization')
     

@@ -7,10 +7,12 @@ from services.database_service import DatabaseService
 from db.supabase_client import get_client
 from services.chat_service import ChatService
 
-# Setup
+# Setup 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+
 
 async def get_chat_response(user_id: str, message: str, window_id: str, conversation_history: List[Dict] = None) -> Generator:
     """Generates a streaming response from Levi, an AI chatbot that provides personalized insights."""
@@ -22,6 +24,7 @@ async def get_chat_response(user_id: str, message: str, window_id: str, conversa
         await ChatService.save_message(user_id, window_id, "user", message)
         if not conversation_history:
             await ChatService.generate_and_update_title(user_id, window_id, message)
+
 
         # Get user data and context
         supabase = get_client()
@@ -39,6 +42,7 @@ async def get_chat_response(user_id: str, message: str, window_id: str, conversa
             .limit(1)\
             .execute()
         member_since = first_entry.data[0]['created_at'] if first_entry.data else user.user.created_at
+
 
         # Get recent entries
         entries_result = DatabaseService.get_recent_entries(user_id, limit=5)

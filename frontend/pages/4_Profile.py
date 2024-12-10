@@ -1,3 +1,9 @@
+# PROFILE PAGE
+# display user profile
+# display user stats
+# display user entries
+# display user chats
+
 import streamlit as st
 from datetime import datetime
 from utils import make_authenticated_request

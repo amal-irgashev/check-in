@@ -1,3 +1,6 @@
+# WELCOME PAGE
+# user auth + login/signup
+
 import streamlit as st
 from auth import init_auth
 from utils import make_authenticated_request
