@@ -5,24 +5,29 @@ import logging
 from auth import init_auth
 from utils import make_authenticated_request
 
+# Make sure user is logged in before showing anything
 init_auth()
 
 st.title("📝 Journal Entries")
 
-# Date range filters
+
+# Let's add some date filters to narrow down entries
 col1, col2 = st.columns(2)
 with col1:
     start_date = st.date_input("From")
 with col2:
     end_date = st.date_input("To")
 
-# Search and filters
+# Add a search box to find specific entries
 search_term = st.text_input("Search entries", placeholder="Enter keywords...")
 
-# Add loading state
+
+
+
+# Show a loading spinner while we fetch the entries
 with st.spinner("Loading entries..."):
     try:
-        # Construct query string
+        # Build up our search filters
         query_params = []
         if search_term:
             query_params.append(f"search={search_term}")
@@ -31,15 +36,18 @@ with st.spinner("Loading entries..."):
         if end_date:
             query_params.append(f"end_date={end_date.isoformat()}")
             
-        # Build endpoint with query string
+        # Put together the API endpoint
         endpoint = "entries"
         if query_params:
             endpoint += "?" + "&".join(query_params)
             
-        # Fetch entries from API
+        # Get entries from our backend
         response = make_authenticated_request("GET", endpoint)
         entries = response
+        
+        
 
+        # Helper function to delete entries
         def delete_entry(entry_id: str):
             try:
                 response = make_authenticated_request(
@@ -49,34 +57,41 @@ with st.spinner("Loading entries..."):
                 
                 if response and response.get("status") == "success":
                     st.success("Entry deleted successfully!")
-                    # Clear all relevant state
+                    # Clean up our state
                     st.session_state.pop(f"confirm_delete_{entry_id}", None)
                     st.session_state.pop('entries', None)  # Clear entries cache
-                    # Force an immediate rerun of the app
+                    # Refresh the page
                     st.rerun()
                 else:
                     st.error("Failed to delete entry")
             except Exception as e:
                 st.error(f"Error deleting entry: {str(e)}")
+                
+                
 
+        # Show all our entries in a nice list
         if entries:
             for entry in entries:
                 try:
+                    # Format the date nicely
                     entry_date = datetime.fromisoformat(entry['created_at'].replace('Z', '+00:00')).strftime('%B %d, %Y %I:%M %p')
                     
                     with st.expander(f"Entry from {entry_date}"):
-                        # Add delete button in a more prominent position
+                        # Set up our delete button stuff
                         delete_key = f"delete_{entry['id']}"
                         confirm_key = f"confirm_delete_{entry['id']}"
                         
-                        # Right-aligned delete button with more space
+                        
+                        
+                        # Put delete button on the right
                         col1, col2 = st.columns([0.8, 0.2])
                         with col2:
-                            # Make delete button more visible with custom styling
                             if st.button("Delete", key=delete_key, help="Delete this entry", type="secondary", use_container_width=True):
                                 st.session_state[confirm_key] = True
+                                
+                                
                         
-                        # Show confirmation dialog if needed
+                        # Double check before deleting
                         if st.session_state.get(confirm_key, False):
                             st.markdown("---")
                             st.warning("⚠️ Are you sure you want to delete this entry?")
@@ -90,10 +105,10 @@ with st.spinner("Loading entries..."):
                                     st.rerun()
                         
                         st.markdown("---")
-                        # Display entry content
+                        # Show the actual journal entry
                         st.write(entry['entry'])
                         
-                        # Check if analysis exists and display it
+                        # Show the AI analysis if we have it
                         if entry.get('journal_analyses') and len(entry['journal_analyses']) > 0:
                             analysis = entry['journal_analyses'][0]
                             st.markdown("---")
@@ -107,6 +122,7 @@ with st.spinner("Loading entries..."):
             st.info("No entries found for the selected criteria.")
             
     except Exception as e:
+        # Oops, something went wrong
         if "User not authenticated" in str(e):
             st.error("Please log in to view entries")
         else:
