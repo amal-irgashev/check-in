@@ -28,7 +28,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://localhost:8501",
-        "https://digital-journal.streamlit.app/"  # Add your deployed frontend URL
+        "https://digital-journal.streamlit.app" 
     ],
     allow_credentials=True,
     allow_methods=["*"],
