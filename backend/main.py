@@ -25,7 +25,11 @@ app = FastAPI()
 # Allow our frontend to talk to our backend (CORS)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:8501"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:8501",
+        "https://digital-journal.streamlit.app/"  # Add your deployed frontend URL
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
