@@ -8,7 +8,6 @@ from dotenv import load_dotenv
 from datetime import datetime
 import uuid
 from typing import Optional
-from db.models import User
 from fastapi import Request, HTTPException
 import logging
 from db.supabase_client import get_client
@@ -30,22 +29,11 @@ class AuthService:
     @staticmethod
     async def sign_up(email: str, password: str):
         try:
-            # 1. Create auth user in Supabase
+            # Only create auth user in Supabase
             auth_response = supabase.auth.sign_up({
                 "email": email,
                 "password": password
             })
-            
-            # 2. Create user record in our database
-            user_data = {
-                "id": auth_response.user.id,  # Use Supabase auth user ID
-                "email": email,
-                "email_verified": True,
-                "created_at": datetime.utcnow().isoformat()
-            }
-            
-            # Insert into our 'users' table
-            db_response = supabase.table('users').insert(user_data).execute()
             
             return auth_response
         except Exception as e:
@@ -83,16 +71,6 @@ class AuthService:
         except Exception as e:
             logging.error(f"Error in get_user: {str(e)}")
             raise Exception(f"Error getting user: {str(e)}")
-
-    @staticmethod
-    async def get_user_profile(user_id: str) -> Optional[User]:
-        try:
-            response = supabase.table('users').select("*").eq('id', user_id).single().execute()
-            if response.data:
-                return User(**response.data)
-            return None
-        except Exception as e:
-            raise Exception(f"Error fetching user profile: {str(e)}")
 
 async def auth_middleware(request: Request, call_next):
     logging.info("=== Auth Middleware Start ===")

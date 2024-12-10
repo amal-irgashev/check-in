@@ -4,7 +4,7 @@ from utils import make_authenticated_request
 
 # Page settings - must be first Streamlit command
 st.set_page_config(
-    page_title="Smart Journal",
+    page_title="📝 Smart Journal",
     page_icon="📔",
     layout="wide"
 )
@@ -45,10 +45,14 @@ if not st.session_state.authenticated:
             login_password = st.text_input("Password", type="password")
             login_submitted = st.form_submit_button("Login")
             
+            # login user
             if login_submitted:
-                from auth import login_user
-                if login_user(login_email, login_password):
+                from auth import sign_in
+                if sign_in(login_email, login_password):
+                    st.success("Successfully logged in!")
                     st.rerun()
+                else:
+                    st.error("Invalid email or password")
 
     with tab2:
         with st.form("signup_form"):
@@ -68,12 +72,19 @@ else:
     # Add logout button in top right
     col1, col2 = st.columns([6,1])
     with col1:
-        st.title("Smart Journal")
+        st.title("📝 Smart Journal")
     with col2:
         from auth import logout_user
         if st.button("Logout"):
             logout_user()
             st.rerun()
-            
-    st.write(f"Welcome back, {st.session_state.user.email}!")
+    
+    # Get user stats including name
+    try:
+        stats = make_authenticated_request("GET", "api/profile/stats")
+        name = stats.get('full_name') or st.session_state.user.email
+        st.write(f"Welcome back, {name}!")
+    except Exception as e:
+        st.write(f"Welcome back, {st.session_state.user.email}!")
+        
     st.write("Please use the navigation menu on the left to access different features.")

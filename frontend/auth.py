@@ -14,6 +14,7 @@ supabase = create_client(
 )
 
 def init_auth():
+    # Initialize session state variables if they don't exist
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
     if 'user' not in st.session_state:
@@ -23,61 +24,65 @@ def init_auth():
     if 'refresh_token' not in st.session_state:
         st.session_state.refresh_token = None
     
-    # Verify existing token if present
-    if st.session_state.access_token:
-        try:
-            response = supabase.auth.get_user(st.session_state.access_token)
+    # Try to get stored tokens from browser storage
+    try:
+        # Check if there's a stored session
+        session = supabase.auth.get_session()
+        
+        if session and session.access_token:
+            # Verify and refresh the token if needed
+            response = supabase.auth.get_user(session.access_token)
             if response and response.user:
                 st.session_state.authenticated = True
                 st.session_state.user = response.user
-            else:
-                _clear_session()
-        except Exception as e:
-            logging.error(f"Auth verification failed: {str(e)}")
-            _clear_session()
+                st.session_state.access_token = session.access_token
+                st.session_state.refresh_token = session.refresh_token
+                return
+            
+    except Exception as e:
+        logging.error(f"Auth verification failed: {str(e)}")
+        _clear_session()
 
 def _clear_session():
     st.session_state.authenticated = False
     st.session_state.user = None
     st.session_state.access_token = None
     st.session_state.refresh_token = None
+    try:
+        supabase.auth.sign_out()
+    except Exception as e:
+        logging.error(f"Error during sign out: {str(e)}")
 
-def login_user(email: str, password: str):
+def sign_in(email: str, password: str) -> bool:
     try:
         response = supabase.auth.sign_in_with_password({
             "email": email,
             "password": password
         })
-        st.session_state.user = response.user
-        st.session_state.access_token = response.session.access_token
-        st.session_state.refresh_token = response.session.refresh_token
-        st.session_state.authenticated = True
         
-        logging.info(f"Login successful for user: {response.user.email}")
-        logging.info(f"Access token received: {response.session.access_token[:10]}...")
-        
-        return True
+        if response.user:
+            st.session_state.authenticated = True
+            st.session_state.user = response.user
+            st.session_state.access_token = response.session.access_token
+            st.session_state.refresh_token = response.session.refresh_token
+            return True
+            
     except Exception as e:
-        logging.error(f"Login failed: {str(e)}")
+        logging.error(f"Sign in error: {str(e)}")
         return False
+    
+    return False
 
-def signup_user(email: str, password: str):
+def sign_up(email: str, password: str) -> bool:
     try:
         response = supabase.auth.sign_up({
             "email": email,
             "password": password
         })
-        st.success("Sign up successful! Please check your email to verify your account.")
-        return True
+        return bool(response.user)
     except Exception as e:
-        st.error(f"Sign up failed: {str(e)}")
+        logging.error(f"Sign up error: {str(e)}")
         return False
 
 def logout_user():
-    try:
-        supabase.auth.sign_out()
-        st.session_state.authenticated = False
-        st.session_state.user = None
-        st.success("Logged out successfully!")
-    except Exception as e:
-        st.error(f"Logout failed: {str(e)}")
+    _clear_session()

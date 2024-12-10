@@ -9,6 +9,8 @@ from services.profile_service import ProfileService
 from services.journal_service import JournalService
 from ai_agents.chatbot import get_chat_response
 from db.supabase_client import get_client
+from fastapi.responses import StreamingResponse
+import json
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -63,17 +65,44 @@ async def create_journal_entry(entry: JournalEntryRequest, request: Request):
     return {"status": "success", "data": {"entry": entry_result.data[0], "analysis": analysis["analysis"]}}
 
 @app.get("/entries")
-async def get_entries(request: Request):
+async def get_entries(
+    request: Request,
+    search: str = None,
+    start_date: str = None,
+    end_date: str = None
+):
     user_id = AuthService.validate_user(request)
     access_token, refresh_token = AuthService.get_tokens_from_request(request)
     DatabaseService.set_auth_session(access_token, refresh_token)
-    return await JournalService.get_entries(user_id)
+    return await JournalService.get_entries(
+        user_id, 
+        search_term=search, 
+        start_date=start_date, 
+        end_date=end_date
+    )
 
 @app.post("/chat")
-async def chat(request: ChatRequest, request_obj: Request):
-    user_id = request_obj.state.user.id
-    response = get_chat_response(user_id, request.message)
-    return {"response": response}
+async def chat(request: ChatRequest, req: Request):
+    try:
+        user_id = AuthService.validate_user(req)
+        access_token, refresh_token = AuthService.get_tokens_from_request(req)
+        DatabaseService.set_auth_session(access_token, refresh_token)
+        
+        async def generate():
+            try:
+                async for token in get_chat_response(user_id, request.message):
+                    yield f"data: {json.dumps({'token': token})}\n\n"
+            except Exception as e:
+                logging.error(f"Chat error: {str(e)}", exc_info=True)
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        
+        return StreamingResponse(
+            generate(),
+            media_type="text/event-stream"
+        )
+    except Exception as e:
+        logging.error(f"Chat endpoint error: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/profile/stats")
 async def get_profile_stats(request: Request):
@@ -89,6 +118,13 @@ async def update_profile(request: Request, data: dict):
     DatabaseService.set_auth_session(access_token, refresh_token)
     supabase = get_client()
     return await ProfileService.update_profile(supabase, data)
+
+@app.delete("/entries/{entry_id}")
+async def delete_entry(entry_id: str, request: Request):
+    user_id = AuthService.validate_user(request)
+    access_token, refresh_token = AuthService.get_tokens_from_request(request)
+    DatabaseService.set_auth_session(access_token, refresh_token)
+    return await JournalService.delete_entry(user_id, entry_id)
 
 @app.get("/")
 def read_root():

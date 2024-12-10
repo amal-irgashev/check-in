@@ -8,6 +8,10 @@ class ProfileService:
         supabase = get_client()
         
         try:
+            # Get user from current session
+            user = supabase.auth.get_user()
+            name = user.user.user_metadata.get('full_name')
+                
             entries = supabase.table("journal_entries")\
                 .select("created_at", count="exact")\
                 .eq('user_id', user_id)\
@@ -25,17 +29,22 @@ class ProfileService:
             member_since = first_entry.data[0]['created_at'] if first_entry.data else None
             
             return {
+                "full_name": name,
                 "total_entries": total_entries,
                 "member_since": member_since
             }
         except Exception as e:
             logging.error(f"Failed to fetch profile stats: {str(e)}")
-            raise HTTPException(status_code=500, detail=str(e))
+            return {
+                "full_name": None,
+                "total_entries": 0,
+                "member_since": None
+            }
 
     @staticmethod
     async def update_profile(supabase_client, data: dict):
         try:
-            # Update auth metadata
+            # Only update auth metadata
             auth_update = supabase_client.auth.update_user({
                 "data": {"full_name": data.get("full_name")}
             })
@@ -43,15 +52,6 @@ class ProfileService:
             if not auth_update:
                 raise HTTPException(status_code=500, detail="Failed to update user profile")
             
-            # Update users table
-            users_update = supabase_client.table('users')\
-                .update({"name": data.get("full_name")})\
-                .eq('id', auth_update.user.id)\
-                .execute()
-                
-            if not users_update:
-                raise HTTPException(status_code=500, detail="Failed to update user table")
-                
             return auth_update.user
         except Exception as e:
             logging.error(f"Error updating user profile: {str(e)}")
