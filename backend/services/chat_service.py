@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import logging
 import os
 from openai import OpenAI
+from fastapi import HTTPException
 
 class ChatService:
     @staticmethod
@@ -31,14 +32,14 @@ class ChatService:
                 .order('last_updated', desc=True)\
                 .execute()
             
-            if result.error:
-                logging.error(f"Supabase error getting chat windows: {result.error}")
-                raise Exception(result.error)
-            
             return result.data or []
+            
         except Exception as e:
             logging.error(f"Error getting chat windows: {str(e)}")
-            raise Exception(f"Failed to fetch chat windows: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to fetch chat windows: {str(e)}"
+            )
 
     @staticmethod
     async def get_chat_history(user_id: str, window_id: str) -> List[Dict]:

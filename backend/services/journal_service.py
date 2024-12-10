@@ -2,55 +2,72 @@ from fastapi import HTTPException
 from db.supabase_client import get_client
 from ai_agents.ai_analysis import analyze_journal_entry
 import logging
+from typing import Optional, Dict, List, Any
 
 class JournalService:
+    """Service class for handling journal-related operations"""
+    
     @staticmethod
-    async def analyze_entry(content: str):
+    async def analyze_entry(content: str) -> Dict[str, Any]:
+        """Analyze a journal entry's content"""
         try:
             analysis = analyze_journal_entry(content)
             return {"status": "success", "analysis": analysis}
         except Exception as e:
             logging.error(f"Analysis failed: {str(e)}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to analyze journal entry"
+            )
 
     @staticmethod
-    async def get_entries(user_id: str, search_term: str = None, start_date: str = None, end_date: str = None):
+    async def get_entries(
+        user_id: str,
+        search_term: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Retrieve journal entries with optional filtering"""
         try:
             supabase = get_client()
+            
+            # Build base query
             query = supabase.table("journal_entries")\
                 .select("*, journal_analyses(*)")\
                 .eq('user_id', user_id)
             
-            # Add search filter if search term is provided
+            # Add filters
             if search_term:
                 query = query.ilike('entry', f'%{search_term}%')
             
-            # Add date range filters if provided
+            # Handle date filtering
             if start_date:
-                query = query.gte('created_at', start_date)
+                query = query.gte('created_at', f"{start_date}T00:00:00")
             if end_date:
-                query = query.lte('created_at', end_date)
+                # Add one day to include entries on the end date
+                query = query.lt('created_at', f"{end_date}T23:59:59")
             
-            # Order by date
+            # Add ordering
             query = query.order('created_at', desc=True)
             
-            # Execute query and log results
+            # Execute query
             result = query.execute()
-            logging.info(f"Fetched entries count: {len(result.data) if result.data else 0}")
-            logging.info(f"Query result: {result.data}")
-            
             return result.data or []
+            
         except Exception as e:
-            logging.error(f"Failed to fetch entries: {str(e)}")
-            raise HTTPException(status_code=500, detail=str(e))
+            logging.error(f"Failed to fetch entries: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to retrieve journal entries: {str(e)}"
+            )
 
-# delete entry
     @staticmethod
-    async def delete_entry(user_id: str, entry_id: str):
+    async def delete_entry(user_id: str, entry_id: str) -> Dict[str, str]:
+        """Delete a journal entry and its associated analyses"""
         try:
             supabase = get_client()
             
-            # First verify the entry belongs to the user
+            # Verify entry ownership
             entry = supabase.table("journal_entries")\
                 .select("id")\
                 .eq('id', entry_id)\
@@ -59,21 +76,33 @@ class JournalService:
                 .execute()
                 
             if not entry.data:
-                raise HTTPException(status_code=404, detail="Entry not found")
+                raise HTTPException(
+                    status_code=404,
+                    detail="Entry not found or access denied"
+                )
                 
-            # Delete associated analyses first (due to foreign key constraint)
+            # Delete associated analyses first
             supabase.table("journal_analyses")\
                 .delete()\
                 .eq('entry_id', entry_id)\
                 .execute()
                 
             # Delete the entry
-            result = supabase.table("journal_entries")\
+            supabase.table("journal_entries")\
                 .delete()\
                 .eq('id', entry_id)\
                 .execute()
                 
-            return {"status": "success", "message": "Entry deleted successfully"}
+            return {
+                "status": "success",
+                "message": "Entry deleted successfully"
+            }
+            
+        except HTTPException:
+            raise
         except Exception as e:
             logging.error(f"Failed to delete entry: {str(e)}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to delete journal entry"
+            )

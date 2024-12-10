@@ -26,23 +26,40 @@ def init_auth():
     if 'refresh_token' not in st.session_state:
         st.session_state.refresh_token = None
     
-    # Try to get stored tokens from browser storage
     try:
         # Check if there's a stored session
         session = supabase.auth.get_session()
         
         if session and session.access_token:
-            # Verify and refresh the token if needed
-            response = supabase.auth.get_user(session.access_token)
-            if response and response.user:
-                st.session_state.authenticated = True
-                st.session_state.user = response.user
-                st.session_state.access_token = session.access_token
-                st.session_state.refresh_token = session.refresh_token
-                return
-            
+            try:
+                # Try to refresh the token first
+                refresh_response = supabase.auth.refresh_session()
+                if refresh_response and refresh_response.session:
+                    st.session_state.authenticated = True
+                    st.session_state.user = refresh_response.user
+                    st.session_state.access_token = refresh_response.session.access_token
+                    st.session_state.refresh_token = refresh_response.session.refresh_token
+                    return
+                
+                # Fallback to verifying current token if refresh fails
+                user_response = supabase.auth.get_user(session.access_token)
+                if user_response and user_response.user:
+                    st.session_state.authenticated = True
+                    st.session_state.user = user_response.user
+                    st.session_state.access_token = session.access_token
+                    st.session_state.refresh_token = session.refresh_token
+                    return
+                
+            except Exception as e:
+                if "token expired" in str(e).lower() or "invalid token" in str(e).lower():
+                    logging.info("Token expired, clearing session")
+                    _clear_session()
+                else:
+                    logging.error(f"Error refreshing/verifying token: {str(e)}")
+                    _clear_session()
+                
     except Exception as e:
-        logging.error(f"Auth verification failed: {str(e)}")
+        logging.error(f"Auth initialization failed: {str(e)}")
         _clear_session()
 
 def _clear_session():
@@ -54,6 +71,26 @@ def _clear_session():
         supabase.auth.sign_out()
     except Exception as e:
         logging.error(f"Error during sign out: {str(e)}")
+    st.rerun()
+
+def refresh_session():
+    """Attempt to refresh the current session"""
+    try:
+        if st.session_state.refresh_token:
+            # Explicitly pass the refresh token
+            response = supabase.auth.refresh_session(
+                refresh_token=st.session_state.refresh_token
+            )
+            if response and response.session:
+                st.session_state.authenticated = True
+                st.session_state.user = response.user
+                st.session_state.access_token = response.session.access_token
+                st.session_state.refresh_token = response.session.refresh_token
+                return True
+    except Exception as e:
+        logging.error(f"Session refresh failed: {str(e)}")
+        _clear_session()
+    return False
 
 def sign_in(email: str, password: str) -> tuple[bool, str]:
     try:

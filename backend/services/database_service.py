@@ -15,10 +15,15 @@ class DatabaseService:
     async def set_auth_session(access_token: str, refresh_token: Optional[str] = None) -> None:
         try:
             supabase = get_client()
+            if not access_token:
+                raise ValueError("Access token is required")
             supabase.auth.set_session(access_token, refresh_token)
         except Exception as e:
             logging.error(f"Error setting auth session: {str(e)}")
-            raise HTTPException(status_code=500, detail="Failed to set authentication session")
+            raise HTTPException(
+                status_code=401, 
+                detail="Failed to set authentication session"
+            )
 
     @staticmethod
     async def create_journal_entry(user_id: str, content: str):
