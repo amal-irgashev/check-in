@@ -30,10 +30,15 @@ class ChatService:
                 .eq('user_id', user_id)\
                 .order('last_updated', desc=True)\
                 .execute()
+            
+            if result.error:
+                logging.error(f"Supabase error getting chat windows: {result.error}")
+                raise Exception(result.error)
+            
             return result.data or []
         except Exception as e:
-            print(f"Error getting chat windows: {str(e)}")
-            return []
+            logging.error(f"Error getting chat windows: {str(e)}")
+            raise Exception(f"Failed to fetch chat windows: {str(e)}")
 
     @staticmethod
     async def get_chat_history(user_id: str, window_id: str) -> List[Dict]:

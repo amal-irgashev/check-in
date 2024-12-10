@@ -27,7 +27,7 @@ with st.form("journal_entry_form"):
         try:
             response = make_authenticated_request(
                 "POST",
-                "journal-entry",
+                "/api/journal/entry",
                 {"content": entry_content}
             )
             if response.get("status") == "success":

@@ -12,13 +12,14 @@ class DatabaseResult:
 
 class DatabaseService:
     @staticmethod
-    def set_auth_session(access_token: str, refresh_token: Optional[str] = None):
-        supabase = get_client()
-        if refresh_token:
+    async def set_auth_session(access_token: str, refresh_token: Optional[str] = None) -> None:
+        try:
+            supabase = get_client()
             supabase.auth.set_session(access_token, refresh_token)
-        else:
-            supabase.auth.set_session(access_token)
-            
+        except Exception as e:
+            logging.error(f"Error setting auth session: {str(e)}")
+            raise HTTPException(status_code=500, detail="Failed to set authentication session")
+
     @staticmethod
     async def create_journal_entry(user_id: str, content: str):
         supabase = get_client()

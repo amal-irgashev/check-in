@@ -1,160 +1,42 @@
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi import FastAPI
 import logging
-from auth.auth import auth_middleware
-from services.database_service import DatabaseService
-from services.auth_service import AuthService
-from services.profile_service import ProfileService
-from services.journal_service import JournalService
-from ai_agents.chatbot import get_chat_response
-from db.supabase_client import get_client
-from fastapi.responses import StreamingResponse
-import json
-from services.chat_service import ChatService
+from core.config import get_settings
+from core.middleware import setup_middleware
+from api.routes import journal, chat, profile
 
+# Setup logging
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-app = FastAPI()
+# Load settings
+settings = get_settings()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:8501"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+# Initialize FastAPI app
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    version=settings.VERSION,
+    description="Journal and Chat API with AI-powered analysis"
 )
 
-# Auth middleware
-@app.middleware("http")
-async def auth_middleware_handler(request: Request, call_next):
-    public_paths = {"/", "/docs", "/openapi.json"}
-    if request.url.path in public_paths:
-        return await call_next(request)
-    return await auth_middleware(request, call_next)
+# Setup middleware
+setup_middleware(app)
 
-# Request db models
-class JournalEntryRequest(BaseModel):
-    content: str
-
-class ChatRequest(BaseModel):
-    message: str
-    window_id: str
-
-# Helper function for common auth setup
-async def setup_auth_session(request: Request):
-    user_id = AuthService.validate_user(request)
-    access_token, refresh_token = AuthService.get_tokens_from_request(request)
-    DatabaseService.set_auth_session(access_token, refresh_token)
-    return user_id
-
-# Routes
-@app.post("/analyze-entry")
-async def analyze_entry(entry: JournalEntryRequest):
-    return await JournalService.analyze_entry(entry.content)
-
-@app.post("/journal-entry")
-async def create_journal_entry(entry: JournalEntryRequest, request: Request):
-    user_id = await setup_auth_session(request)
-    
-    entry_result = await DatabaseService.create_journal_entry(user_id, entry.content)
-    if not entry_result.data:
-        raise HTTPException(status_code=500, detail="Failed to save journal entry")
-        
-    entry_id = entry_result.data[0]['id']
-    analysis = await JournalService.analyze_entry(entry.content)
-    await DatabaseService.save_analysis(entry_id, analysis["analysis"])
-    
-    return {"status": "success", "data": {"entry": entry_result.data[0], "analysis": analysis["analysis"]}}
-
-@app.get("/entries")
-async def get_entries(request: Request, search: str = None, start_date: str = None, end_date: str = None):
-    user_id = await setup_auth_session(request)
-    return await JournalService.get_entries(user_id, search_term=search, start_date=start_date, end_date=end_date)
-
-@app.post("/chat")
-async def chat(request: Request, chat_request: ChatRequest):
-    try:
-        user_id = await setup_auth_session(request)
-        window_id = chat_request.window_id
-        
-        async def generate():
-            async for token in get_chat_response(user_id, chat_request.message, window_id):
-                yield f"data: {json.dumps({'token': token})}\n\n"
-                
-        return StreamingResponse(generate(), media_type="text/event-stream")
-    except Exception as e:
-        logging.error(f"Chat endpoint error: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/profile/stats")
-async def get_profile_stats(request: Request):
-    user_id = await setup_auth_session(request)
-    return await ProfileService.get_stats(user_id)
-
-@app.post("/api/profile/update")
-async def update_profile(request: Request, data: dict):
-    await setup_auth_session(request)
-    return await ProfileService.update_profile(get_client(), data)
-
-@app.delete("/entries/{entry_id}")
-async def delete_entry(entry_id: str, request: Request):
-    user_id = await setup_auth_session(request)
-    return await JournalService.delete_entry(user_id, entry_id)
+# Include routers with proper prefixes
+app.include_router(journal.router, prefix=settings.API_PREFIX)
+app.include_router(chat.router, prefix=settings.API_PREFIX)
+app.include_router(profile.router, prefix=settings.API_PREFIX)
 
 @app.get("/")
-def read_root():
-    return {"message": "API is running!"}
+async def read_root():
+    """Health check endpoint"""
+    return {"message": "API is running!", "version": settings.VERSION}
 
-@app.post("/chat/window/create")
-async def create_chat_window(request: Request):
-    try:
-        user_id = await setup_auth_session(request)
-        window = await ChatService.create_chat_window(user_id)
-        return window
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+@app.on_event("startup")
+async def startup_event():
+    """Startup tasks"""
+    logger.info("Starting up API server...")
 
-@app.get("/chat/windows")
-async def get_chat_windows(request: Request):
-    try:
-        user_id = await setup_auth_session(request)
-        windows = await ChatService.get_chat_windows(user_id)
-        return windows
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/chat/history/{window_id}")
-async def get_window_history(window_id: str, request: Request):
-    try:
-        user_id = await setup_auth_session(request)
-        history = await ChatService.get_chat_history(user_id, window_id)
-        return history
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.delete("/chat/window/{window_id}")
-async def delete_chat_window(window_id: str, request: Request):
-    try:
-        user_id = await setup_auth_session(request)
-        success = await ChatService.delete_window(user_id, window_id)
-        if success:
-            return {"message": "Chat window deleted successfully"}
-        raise HTTPException(status_code=404, detail="Chat window not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.put("/chat/window/{window_id}/rename")
-async def rename_chat_window(window_id: str, request: Request, data: dict):
-    try:
-        user_id = await setup_auth_session(request)
-        new_title = data.get("title")
-        if not new_title:
-            raise HTTPException(status_code=400, detail="Title is required")
-        
-        success = await ChatService.rename_window(user_id, window_id, new_title)
-        if success:
-            return {"message": "Chat window renamed successfully"}
-        raise HTTPException(status_code=404, detail="Chat window not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup tasks"""
+    logger.info("Shutting down API server...")

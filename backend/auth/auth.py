@@ -82,7 +82,7 @@ async def auth_middleware(request: Request, call_next):
         raise HTTPException(status_code=401, detail="Invalid authentication credentials")
     
     token = auth_header.split(' ')[1]
-    refresh_token = request.headers.get('X-Refresh-Token')  # Get refresh token from header
+    refresh_token = request.headers.get('X-Refresh-Token')
     logging.info(f"Token extracted: {token[:10]}...")
     
     try:

@@ -4,10 +4,12 @@ from dotenv import load_dotenv
 import streamlit as st
 import requests
 import logging
+from typing import Optional, Any, Dict
 
 load_dotenv()
 
 API_BASE_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+API_URL = f"{API_BASE_URL}/api/v1"
 
 def get_auth_headers():
     """Get authentication headers for API requests"""
@@ -40,27 +42,47 @@ def handle_request_error(error: requests.exceptions.RequestException):
             
     raise Exception(f"Request failed: {str(error)}")
 
-def make_authenticated_request(method: str, endpoint: str, data: dict = None, stream: bool = False):
-    """Make an authenticated request to the backend API"""
-    try:
-        url = f"{API_BASE_URL}/{endpoint}"
-        headers = get_auth_headers()
+def make_authenticated_request(
+    method: str, 
+    endpoint: str, 
+    data: Optional[Dict] = None, 
+    stream: bool = False
+) -> Any:
+    """Make an authenticated request to the API"""
+    if not endpoint.startswith('/'):
+        endpoint = '/' + endpoint
         
-        if method.upper() == "GET":
-            response = requests.get(url, headers=headers, stream=stream)
-        elif method.upper() == "POST":
-            response = requests.post(url, json=data, headers=headers, stream=stream)
-        else:
-            raise ValueError(f"Unsupported HTTP method: {method}")
-            
+    url = f"{API_URL}{endpoint}"
+    
+    headers = {}
+    if st.session_state.get("access_token"):
+        headers["Authorization"] = f"Bearer {st.session_state.access_token}"
+    
+    try:
+        response = requests.request(
+            method=method,
+            url=url,
+            json=data if data else None,
+            headers=headers,
+            stream=stream
+        )
+        response.raise_for_status()
+        
         if stream:
             return response
-            
-        response.raise_for_status()
         return response.json()
-        
     except requests.exceptions.RequestException as e:
-        handle_request_error(e)
+        if e.response is not None:
+            status_code = e.response.status_code
+            if status_code == 401:
+                st.session_state.authenticated = False
+                raise Exception("User not authenticated")
+            elif status_code == 404:
+                raise Exception(f"Request failed: {e}")
+            else:
+                raise Exception(f"API error: {e}")
+        else:
+            raise Exception(f"Network error: {e}")
 
 def _clear_session():
     st.session_state.authenticated = False

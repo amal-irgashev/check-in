@@ -32,7 +32,7 @@ with st.spinner("Loading entries..."):
             query_params.append(f"end_date={end_date.isoformat()}")
             
         # Build endpoint with query string
-        endpoint = "entries"
+        endpoint = "journal/entries"
         if query_params:
             endpoint += "?" + "&".join(query_params)
             
@@ -42,7 +42,12 @@ with st.spinner("Loading entries..."):
 
         def delete_entry(entry_id: str):
             try:
-                response = make_authenticated_request("DELETE", f"entries/{entry_id}")
+                # Use POST method with a custom header to indicate DELETE
+                response = make_authenticated_request(
+                    "POST",
+                    f"journal/entries/{entry_id}/delete",  # Remove the /api prefix
+                    {}
+                )
                 
                 if response and response.get("status") == "success":
                     st.success("Entry deleted successfully!")
