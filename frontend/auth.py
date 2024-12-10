@@ -53,7 +53,7 @@ def _clear_session():
     except Exception as e:
         logging.error(f"Error during sign out: {str(e)}")
 
-def sign_in(email: str, password: str) -> bool:
+def sign_in(email: str, password: str) -> tuple[bool, str]:
     try:
         response = supabase.auth.sign_in_with_password({
             "email": email,
@@ -65,24 +65,47 @@ def sign_in(email: str, password: str) -> bool:
             st.session_state.user = response.user
             st.session_state.access_token = response.session.access_token
             st.session_state.refresh_token = response.session.refresh_token
-            return True
+            return True, "Successfully logged in!"
             
     except Exception as e:
-        logging.error(f"Sign in error: {str(e)}")
-        return False
+        error_msg = str(e)
+        if "Invalid login credentials" in error_msg:
+            return False, "Invalid email or password."
+        elif "Email not confirmed" in error_msg:
+            return False, "Please confirm your email address before logging in."
+        else:
+            logging.error(f"Sign in error: {error_msg}")
+            return False, "An error occurred during sign in. Please try again."
     
-    return False
+    return False, "Login failed. Please check your credentials."
 
-def sign_up(email: str, password: str) -> bool:
+def sign_up(email: str, password: str) -> tuple[bool, str]:
     try:
         response = supabase.auth.sign_up({
             "email": email,
             "password": password
         })
-        return bool(response.user)
+        
+        if response.user:
+            if response.user.confirmed_at:
+                # User is automatically confirmed
+                return True, "Account created successfully!"
+            else:
+                # Email confirmation required
+                return True, "Please check your email to confirm your account."
+        return False, "Failed to create account."
+        
     except Exception as e:
-        logging.error(f"Sign up error: {str(e)}")
-        return False
+        error_msg = str(e)
+        if "User already registered" in error_msg:
+            return False, "This email is already registered."
+        elif "Password should be at least" in error_msg:
+            return False, "Password is too weak. Please use a stronger password."
+        elif "Invalid email" in error_msg:
+            return False, "Please enter a valid email address."
+        else:
+            logging.error(f"Sign up error: {error_msg}")
+            return False, "An error occurred during sign up. Please try again."
 
 def logout_user():
     _clear_session()
